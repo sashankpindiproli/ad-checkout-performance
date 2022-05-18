@@ -1,7 +1,7 @@
 import { load } from "../pageObjects";
 import { lighthouseFromPuppeteer } from '../pageObjects/perfUtil/lighthouse'
 
-describe('LCP Measurement',() => {
+xdescribe('LCP Measurement',() => {
   beforeAll(async () => {
     await load();
   });

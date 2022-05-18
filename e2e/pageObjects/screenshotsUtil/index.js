@@ -11,9 +11,6 @@ export const takeAndCompareScreenshot = async (page, route, filePrefix) => {
   const currentDate = new Date().toISOString().slice(0, 10);
   // If you didn't specify a file, use the name of the route.
   let fileName = filePrefix + '__' + (route ? route : 'index');
-  if (!fs.existsSync(`${testDir}/${currentDate}`)) fs.mkdirSync(`${testDir}/${currentDate}`,{ recursive: true });
-  if (!fs.existsSync(goldenDir)) fs.mkdirSync(goldenDir);
-  if (!fs.existsSync(`${diffDir}/${currentDate}`)) fs.mkdirSync(`${diffDir}/${currentDate}`,{ recursive: true });
   if (!fs.existsSync(perfDir)) fs.mkdirSync(perfDir,{ recursive: true });
   if (!fs.existsSync(`${traceDir}/${currentDate}`)) fs.mkdirSync(`${traceDir}/${currentDate}`,{ recursive: true });
   // Start the browser, go to that page, and take a screenshot.
@@ -23,8 +20,11 @@ export const takeAndCompareScreenshot = async (page, route, filePrefix) => {
   return compareScreenshots(fileName, currentDate);
 }
 
-export const compareScreenshots = (fileName, currentDate) =>{
+export const compareScreenshots = (fileName, currentDate, testDir = 'images/screenshot', goldenDir = 'images/screenshot-golden', diffDir = 'images/screenshot-diff') =>{
   return new Promise((resolve, reject) => {
+    if (!fs.existsSync(`${testDir}/${currentDate}`)) fs.mkdirSync(`${testDir}/${currentDate}`,{ recursive: true });
+    if (!fs.existsSync(goldenDir)) fs.mkdirSync(goldenDir,{ recursive: true });
+    if (!fs.existsSync(`${diffDir}/${currentDate}`)) fs.mkdirSync(`${diffDir}/${currentDate}`,{ recursive: true });
     const img1 = fs.createReadStream(`${testDir}/${currentDate}/${fileName}.png`).pipe(new PNG()).on('parsed', doneReading);
     const img2 = fs.createReadStream(`${goldenDir}/${fileName}.png`).pipe(new PNG()).on('parsed', doneReading);
 
@@ -46,30 +46,28 @@ export const compareScreenshots = (fileName, currentDate) =>{
   });
 }
 
-export const autoScrollDown = async (page) => {
-  await page.evaluate(async () => {
-      await new Promise((resolve, reject) => {
-          var totalHeight = 0;
-          var distance = 100;
-          var timer = setInterval(() => {
-              var scrollHeight = document.body.scrollHeight;
-              window.scrollBy(0, distance);
-              totalHeight += distance;
-
-              if(totalHeight >= scrollHeight){
-                  clearInterval(timer);
-                  resolve();
-              }
-          }, 100);
-      });
-  });
-}
-
-export const autoScrollDownToEle = async (selector, index) => {
-  await page.evaluate((selector, index) => {
-          const element = document.querySelectorAll(selector)[index];
-          if(element) {
-            element.scrollIntoView();
-          }
-      },selector, index);
+export const  scrollIntoViewIfOutOfView = async (xpath) => {
+  await page.evaluate(async (xpath) => {
+    const el =  document.querySelector(xpath);
+    var topOfPage = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop;
+    var heightOfPage = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+    var elY = 0;
+    var elH = 0;
+    if (document.layers) { // NS4
+        elY = el.y;
+        elH = el.height;
+    }
+    else {
+        for(var p=el; p&&p.tagName!='BODY'; p=p.offsetParent){
+            elY += p.offsetTop;
+        }
+        elH = el.offsetHeight;
+    }
+    if ((topOfPage + heightOfPage) < (elY + elH)) {
+        el.scrollIntoView(false);
+    }
+    else if (elY < topOfPage) {
+        el.scrollIntoView(true);
+    }
+  }, xpath);
 }
